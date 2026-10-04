@@ -36,11 +36,20 @@ class MediaController extends Controller
 
     public function destroy(MediaAsset $media): RedirectResponse
     {
-        abort_if(PortfolioItem::query()->where('image_path', $media->path)->exists(), 409, 'This image is currently used by published or draft content.');
+        $usedBy = PortfolioItem::query()->where('image_path', $media->path);
+        $affectedItems = (clone $usedBy)->count();
+
+        // Detach the asset first so projects and personal sections fall back to their
+        // built-in artwork instead of leaving broken image URLs behind.
+        $usedBy->update(['image_path' => null]);
 
         Storage::disk('public')->delete($media->path);
         $media->delete();
 
-        return back()->with('status', 'Image removed.');
+        $message = $affectedItems > 0
+            ? "Image removed. {$affectedItems} content item(s) now use the default artwork."
+            : 'Image removed.';
+
+        return back()->with('status', $message);
     }
 }

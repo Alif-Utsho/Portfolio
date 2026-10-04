@@ -1,4 +1,5 @@
 @extends('portfolio.layout')
+@section('analytics_project_id', $project->id)
 
 @section('meta_title', $project->title.' — '.($settings['site_title'] ?? 'Alif Utsho'))
 @section('meta_description', $project->summary ?: $project->title.' — selected project by '.($settings['site_title'] ?? 'Alif Utsho').'.')

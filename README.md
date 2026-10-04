@@ -26,6 +26,14 @@ Sign in at `/admin/login`. The owner can update profile and SEO settings; create
 
 The initial portfolio content avoids details that were not verified from the supplied brief or public project sources. Update the editable profile, employment, and CV settings after confirming the source information.
 
+## Visitor analytics and GeoLite2
+
+Anonymous analytics are enabled by default for successful public HTML pages. The privacy notice lets a visitor opt out; opted-out browsers are not tracked. Analytics use first-party random visitor/session IDs and keep detailed records indefinitely. No raw IP address, full user-agent string, contact fields, or arbitrary client metadata are retained.
+
+Approximate country, region, and city are available when a local MaxMind GeoLite2 City database is configured. Create `storage/app/geoip`, obtain the GeoLite2 City database through a MaxMind account, place `GeoLite2-City.mmdb` there, and set `MAXMIND_GEOIP_DATABASE` in `.env` to its path. The database is ignored by source control and should be updated from MaxMind periodically; replace the file atomically so requests never read a partial download. If the file is missing or has no match, location is shown as Unknown. No visitor IP is sent to an external GeoIP service.
+
+The scheduler builds daily analytics rollups just after midnight. Configure the Laravel scheduler to invoke `php artisan schedule:run` every minute. Detailed visits remain available regardless of rollup state.
+
 ## Production deployment
 
 Configure `ADMIN_SETUP_KEY` and MySQL credentials through the deployment environment. Run `php artisan migrate --force`, `php artisan storage:link`, and `npm run build`. Use HTTPS, set `APP_DEBUG=false`, and remove the setup key after creating the owner. Back up the database and `storage/app/public` uploads together.

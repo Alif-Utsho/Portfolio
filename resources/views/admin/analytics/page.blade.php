@@ -1,0 +1,5 @@
+@extends('admin.layout')
+@section('title', 'Page details')
+@section('content')
+<div class="page-heading"><div><span class="sidebar-label">PAGE PERFORMANCE</span><h1>{{ $path }}</h1><p>{{ $views->total() }} page views in the selected period.</p></div><a class="admin-button admin-button-quiet" href="{{ route('admin.analytics.pages') }}">← All pages</a></div>@include('admin.analytics.filters', ['path' => $path])<section class="admin-panel table-panel"><div class="table-scroll"><table><thead><tr><th>Viewed</th><th>Duration</th><th>Project</th></tr></thead><tbody>@forelse ($views as $view)<tr><td>{{ \Illuminate\Support\Carbon::parse($view->viewed_at)->format('M j, Y H:i:s') }}</td><td>{{ $view->duration_seconds ? $view->duration_seconds.' sec' : '—' }}</td><td>{{ $view->project_id ? 'Project #'.$view->project_id : '—' }}</td></tr>@empty<tr><td colspan="3">No views for this page.</td></tr>@endforelse</tbody></table></div><div class="simple-pagination">{{ $views->links('pagination::simple-tailwind') }}</div></section>
+@endsection

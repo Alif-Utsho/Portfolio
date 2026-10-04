@@ -165,3 +165,77 @@ updateGitHubSnapshot().catch(() => {
     const status = document.querySelector('.github-live');
     if (status) status.textContent = 'PROFILE SNAPSHOT';
 });
+
+const analyticsBody = document.body;
+const analyticsEventUrl = analyticsBody.dataset.analyticsEventUrl;
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+const sendAnalyticsEvent = (event, extra = {}) => {
+    if (!analyticsEventUrl || document.cookie.split('; ').includes('analytics_opt_out=1')) return;
+    fetch(analyticsEventUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        keepalive: true,
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken ?? '' },
+        body: JSON.stringify({ event, path: `${location.pathname}${location.hash}`, project_id: analyticsBody.dataset.projectId || null, ...extra }),
+    }).catch(() => {});
+};
+
+let pageStartedAt = Date.now();
+let formStarted = false;
+document.querySelector('#contact-form')?.addEventListener('focusin', () => {
+    if (!formStarted) { formStarted = true; sendAnalyticsEvent('contact_form_start'); }
+}, { once: true });
+const contactSection = document.querySelector('#contact');
+if (contactSection && 'IntersectionObserver' in window) {
+    const sectionObserver = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+            sendAnalyticsEvent('contact_section_view');
+            sectionObserver.disconnect();
+        }
+    }, { threshold: 0.25 });
+    sectionObserver.observe(contactSection);
+}
+document.querySelectorAll('a[href]').forEach((link) => {
+    link.addEventListener('click', () => {
+        const href = link.getAttribute('href') || '';
+        const label = `${link.textContent || ''} ${href}`.toLowerCase();
+        if (href.startsWith('mailto:')) sendAnalyticsEvent('email_click', { target: 'email' });
+        else if (/\.pdf(?:$|[?#])/i.test(href) || /resume|curriculum vitae|download cv/i.test(label)) {
+            sendAnalyticsEvent('cv_click', { target: 'cv' });
+            if (/\.pdf(?:$|[?#])/i.test(href) || /download cv/i.test(label)) sendAnalyticsEvent('cv_download', { target: 'cv' });
+        }
+        else if (/repository|github|source code/i.test(label)) sendAnalyticsEvent('repository_click', { target: 'repository' });
+        else if (/live project|live demo|demo/i.test(label)) sendAnalyticsEvent('demo_click', { target: 'demo' });
+        else if (link.closest('.hero-socials, .site-footer')) sendAnalyticsEvent('social_click', { target: 'social' });
+        else if (link.closest('.nav-links')) sendAnalyticsEvent('navigation_click', { target: 'navigation' });
+    });
+});
+window.addEventListener('pagehide', () => sendAnalyticsEvent('page_duration', { duration: Math.round((Date.now() - pageStartedAt) / 1000) }));
+
+const analyticsNotice = document.querySelector('[data-analytics-notice]');
+const analyticsOptOut = document.cookie.split('; ').includes('analytics_opt_out=1') || localStorage.getItem('analytics-opted-out') === '1';
+if (analyticsNotice && !analyticsOptOut && !localStorage.getItem('analytics-notice-dismissed')) analyticsNotice.hidden = false;
+document.querySelector('[data-analytics-opt-out]')?.addEventListener('click', async () => {
+    document.cookie = 'analytics_opt_out=1; Max-Age=34128000; Path=/; SameSite=Lax';
+    localStorage.setItem('analytics-opted-out', '1');
+    localStorage.setItem('analytics-notice-dismissed', '1');
+    analyticsNotice.hidden = true;
+    try { await fetch(analyticsBody.dataset.analyticsOptOutUrl, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-TOKEN': csrfToken ?? '', Accept: 'application/json' } }); } catch {}
+});
+document.querySelector('[data-analytics-notice-close]')?.addEventListener('click', () => {
+    analyticsNotice.hidden = true;
+    localStorage.setItem('analytics-notice-dismissed', '1');
+});
+document.querySelector('[data-analytics-preferences]')?.addEventListener('click', () => {
+    if (analyticsNotice) analyticsNotice.hidden = false;
+});
+
+if (analyticsBody.dataset.analyticsActivityUrl && !analyticsOptOut) {
+    let lastVisitorActivity = Date.now();
+    ['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach((eventName) => window.addEventListener(eventName, () => { lastVisitorActivity = Date.now(); }, { passive: true }));
+    const sendActivity = () => {
+        if (document.visibilityState === 'visible' && Date.now() - lastVisitorActivity < 120000) fetch(analyticsBody.dataset.analyticsActivityUrl, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-TOKEN': csrfToken ?? '', Accept: 'application/json' } }).catch(() => {});
+    };
+    window.setInterval(sendActivity, 30000);
+    document.addEventListener('visibilitychange', sendActivity);
+}

@@ -6,6 +6,7 @@ use App\Http\Requests\StoreContactMessageRequest;
 use App\Models\ContactMessage;
 use App\Models\PortfolioItem;
 use App\Models\PortfolioSetting;
+use App\Services\PortfolioAnalytics;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
@@ -83,9 +84,10 @@ class PublicPortfolioController extends Controller
         ]);
     }
 
-    public function contact(StoreContactMessageRequest $request): RedirectResponse
+    public function contact(StoreContactMessageRequest $request, PortfolioAnalytics $analytics): RedirectResponse
     {
         ContactMessage::query()->create($request->safe()->only(['name', 'email', 'subject', 'message']));
+        $analytics->recordEvent($request, ['event' => 'contact_submit', 'path' => '/#contact']);
 
         return back()->with('contact_submitted', true);
     }
