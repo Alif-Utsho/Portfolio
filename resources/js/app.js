@@ -13,27 +13,28 @@ if (savedTheme === 'light' || savedTheme === 'dark') {
 const updateThemeControl = () => {
     const isDark = root.dataset.theme === 'dark';
 
-    themeToggle.setAttribute('aria-label', `Switch to ${isDark ? 'light' : 'dark'} theme`);
-    themeToggle.querySelector('.theme-icon').textContent = isDark ? '◐' : '☼';
+    themeToggle?.setAttribute('aria-label', `Switch to ${isDark ? 'light' : 'dark'} theme`);
+    const themeIcon = themeToggle?.querySelector('.theme-icon');
+    if (themeIcon) themeIcon.textContent = isDark ? '◐' : '☼';
     document.querySelector('meta[name="theme-color"]').setAttribute('content', isDark ? '#111411' : '#f3f3ee');
 };
 
 updateThemeControl();
 
-themeToggle.addEventListener('click', () => {
+themeToggle?.addEventListener('click', () => {
     root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
     window.localStorage.setItem('portfolio-theme', root.dataset.theme);
     updateThemeControl();
 });
 
 const updateHeader = () => {
-    header.classList.toggle('is-scrolled', window.scrollY > 18);
+    header?.classList.toggle('is-scrolled', window.scrollY > 18);
 };
 
 updateHeader();
 window.addEventListener('scroll', updateHeader, { passive: true });
 
-menuToggle.addEventListener('click', () => {
+menuToggle?.addEventListener('click', () => {
     const isExpanded = menuToggle.getAttribute('aria-expanded') === 'true';
 
     menuToggle.setAttribute('aria-expanded', String(!isExpanded));
@@ -41,7 +42,7 @@ menuToggle.addEventListener('click', () => {
     navigation.classList.toggle('is-open', !isExpanded);
 });
 
-navigation.querySelectorAll('a').forEach((link) => {
+navigation?.querySelectorAll('a').forEach((link) => {
     link.addEventListener('click', () => {
         navigation.classList.remove('is-open');
         menuToggle.setAttribute('aria-expanded', 'false');
@@ -66,7 +67,7 @@ const sectionObserver = new IntersectionObserver((entries) => {
             return;
         }
 
-        navigation.querySelectorAll('a').forEach((link) => {
+        navigation?.querySelectorAll('a').forEach((link) => {
             link.classList.toggle('is-active', link.hash === `#${entry.target.id}`);
         });
     });
@@ -103,7 +104,10 @@ document.querySelectorAll('.filter-button').forEach((button) => {
 });
 
 const updateGitHubSnapshot = async () => {
-    const profileResponse = await fetch('https://api.github.com/users/Alif-Utsho', {
+    const githubCard = document.querySelector('[data-github-username]');
+    if (!githubCard) return;
+    const username = githubCard.dataset.githubUsername;
+    const profileResponse = await fetch(`https://api.github.com/users/${encodeURIComponent(username)}`, {
         headers: { Accept: 'application/vnd.github+json' },
     });
 
@@ -112,7 +116,7 @@ const updateGitHubSnapshot = async () => {
     }
 
     const profile = await profileResponse.json();
-    const repositoriesResponse = await fetch('https://api.github.com/users/Alif-Utsho/repos?per_page=100', {
+    const repositoriesResponse = await fetch(`https://api.github.com/users/${encodeURIComponent(username)}/repos?per_page=100`, {
         headers: { Accept: 'application/vnd.github+json' },
     });
 
@@ -158,10 +162,6 @@ const updateGitHubSnapshot = async () => {
 };
 
 updateGitHubSnapshot().catch(() => {
-    document.querySelector('.github-live').textContent = 'PROFILE SNAPSHOT';
-});
-
-document.querySelector('#contact-form').addEventListener('submit', (event) => {
-    event.preventDefault();
-    document.querySelector('#form-status').textContent = 'No email service is connected yet, so this message was not sent. Please connect through GitHub.';
+    const status = document.querySelector('.github-live');
+    if (status) status.textContent = 'PROFILE SNAPSHOT';
 });

@@ -1,58 +1,37 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Personal portfolio
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A Laravel portfolio with a public homepage, project index, project detail pages, and a private owner CMS.
 
-## About Laravel
+## Local setup
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+1. Install PHP, Composer, Node.js, and npm.
+2. Install dependencies: `composer install` and `npm install`.
+3. Copy `.env.example` to `.env`, set `APP_KEY` with `php artisan key:generate`, and configure `ADMIN_SETUP_KEY` to a long random value.
+4. Create a MySQL database named `portfolio` and set its connection values in `.env` (`DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD`). Then run `php artisan migrate --seed`.
+5. Create the public upload symlink with `php artisan storage:link`.
+6. Build assets with `npm run build`, then start Laravel with `php artisan serve`.
+7. Open `/admin/setup` and enter the same `ADMIN_SETUP_KEY` to create the first and only owner account. Setup closes once that account exists. Remove the key from the deployment environment after setup.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Public site
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- `/` contains the editable profile, experience, skills, personal sections, featured projects, GitHub profile snapshot, and contact form.
+- `/projects` lists published projects with category filters.
+- `/projects/{slug}` shows a published project's details; drafts and unknown slugs return 404.
+- The contact form stores submissions in the private inbox at `/admin/messages`. It does not send email.
+- GitHub profile and repository statistics are fetched in the browser. If the API is unavailable, the page retains its seeded snapshot and identifies it as a snapshot.
 
-## Learning Laravel
+## Admin CMS
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+Sign in at `/admin/login`. The owner can update profile and SEO settings; create, edit, publish, order, or delete projects, experience, skills, personal sections, social links, and navigation; upload public portfolio media; and review, mark, archive, or delete contact messages. Project records remain manually curated rather than imported from GitHub.
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+The initial portfolio content avoids details that were not verified from the supplied brief or public project sources. Update the editable profile, employment, and CV settings after confirming the source information.
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+## Production deployment
 
-## Agentic Development
+Configure `ADMIN_SETUP_KEY` and MySQL credentials through the deployment environment. Run `php artisan migrate --force`, `php artisan storage:link`, and `npm run build`. Use HTTPS, set `APP_DEBUG=false`, and remove the setup key after creating the owner. Back up the database and `storage/app/public` uploads together.
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+The checked-in/local SQLite database remains available as a backup when switching an existing installation to MySQL. Copy its portfolio, profile settings, owner accounts, messages, and media metadata into the migrated MySQL database before using the MySQL-backed site. Keep the SQLite file until those records have been verified in MySQL.
 
-```bash
-composer require laravel/boost --dev
+## Verification
 
-php artisan boost:install
-```
-
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
-
-## Contributing
-
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Run the focused Laravel feature suite with `php artisan test --compact` and check compiled Blade views with `php artisan view:cache`. Build production assets with `npm run build`.
