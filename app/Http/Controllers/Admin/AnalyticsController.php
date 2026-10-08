@@ -128,7 +128,7 @@ class AnalyticsController extends Controller
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
-    /** @return array{from: CarbonImmutable, to: CarbonImmutable, country_code: ?string, device: ?string, browser: ?string, operating_system: ?string, referrer_domain: ?string, visitor_type: ?string} */
+    /** @return array{from: CarbonImmutable, to: CarbonImmutable, range: string, country_code: ?string, device: ?string, browser: ?string, operating_system: ?string, source: ?string, referrer_domain: ?string, page: ?string, visitor_type: ?string} */
     private function filters(Request $request): array
     {
         $validated = $request->validate([
@@ -149,7 +149,37 @@ class AnalyticsController extends Controller
             abort(422, 'Date range cannot exceed 365 days.');
         }
 
-        return ['from' => $from, 'to' => $to, 'country_code' => $validated['country_code'] ?? null, 'device' => $validated['device'] ?? null, 'browser' => $validated['browser'] ?? null, 'operating_system' => $validated['operating_system'] ?? null, 'referrer_domain' => $validated['source'] ?? $validated['referrer_domain'] ?? null, 'page' => $validated['page'] ?? null, 'visitor_type' => $validated['visitor_type'] ?? null];
+        $today = CarbonImmutable::today();
+        $range = 'custom';
+
+        if ($from->isSameDay($today) && $to->isSameDay($today)) {
+            $range = 'today';
+        } elseif ($from->isSameDay($today->subDay()) && $to->isSameDay($today->subDay())) {
+            $range = 'yesterday';
+        } else {
+            foreach ([7, 30, 90, 365] as $days) {
+                if ($from->isSameDay($today->subDays($days - 1)) && $to->isSameDay($today)) {
+                    $range = (string) $days;
+                    break;
+                }
+            }
+        }
+
+        $source = $validated['source'] ?? $validated['referrer_domain'] ?? null;
+
+        return [
+            'from' => $from,
+            'to' => $to,
+            'range' => $range,
+            'country_code' => $validated['country_code'] ?? null,
+            'device' => $validated['device'] ?? null,
+            'browser' => $validated['browser'] ?? null,
+            'operating_system' => $validated['operating_system'] ?? null,
+            'source' => $source,
+            'referrer_domain' => $source,
+            'page' => $validated['page'] ?? null,
+            'visitor_type' => $validated['visitor_type'] ?? null,
+        ];
     }
 
     private function spreadsheetSafe(string $value): string

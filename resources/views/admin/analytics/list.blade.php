@@ -1,7 +1,7 @@
 @extends('admin.layout')
 @section('title', $title)
 @section('content')
-<div class="page-heading"><div><span class="sidebar-label">{{ $eyebrow }}</span><h1>{{ $title }}</h1><p>{{ $description }}</p></div><a class="admin-button admin-button-quiet" href="{{ route('admin.analytics.export', array_merge(request()->query(), ['kind' => $kind])) }}">Export CSV ↓</a></div>
+<div class="page-heading"><div><span class="sidebar-label">{{ $eyebrow }}</span><h1>{{ $title }}</h1><p>{{ $description }}</p></div><div class="page-heading-actions"><a class="admin-button admin-button-quiet" href="{{ route('admin.analytics.export', array_merge(request()->query(), ['kind' => $kind])) }}">Export CSV ↓</a>@include('admin.analytics.filter-toggle')</div></div>
 @include('admin.analytics.filters')
 <div class="admin-panel table-panel"><div class="table-scroll"><table><thead>@if ($kind === 'visitors')<tr><th>Visitor</th><th>First seen</th><th>Location</th><th>Device</th><th>Latest page</th><th>Pages</th></tr>@elseif ($kind === 'pages')<tr><th>Page</th><th>Views</th><th>Details</th></tr>@else<tr><th>Event</th><th>Page</th><th>Project</th><th>When</th></tr>@endif</thead><tbody>
 @forelse ($rows as $row)

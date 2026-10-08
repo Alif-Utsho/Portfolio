@@ -20,6 +20,20 @@ document.addEventListener('click', (event) => {
     if (sidebar?.classList.contains('is-open') && !sidebar.contains(event.target) && !sidebarToggle?.contains(event.target)) setSidebarOpen(false);
 });
 
+document.querySelectorAll('[data-analytics-filter-toggle]').forEach((toggle) => {
+    const fields = document.getElementById(toggle.getAttribute('aria-controls'));
+    const form = fields?.closest('.analytics-filters');
+    if (!form) return;
+    toggle.addEventListener('click', () => {
+        const isOpen = form.classList.toggle('is-open');
+        toggle.setAttribute('aria-expanded', String(isOpen));
+        const label = isOpen ? 'Hide filters' : 'Show filters';
+        toggle.setAttribute('aria-label', label);
+        toggle.setAttribute('title', label);
+        toggle.querySelector('.sr-only').textContent = label;
+    });
+});
+
 const realtimeWidget = document.querySelector('[data-realtime-widget]');
 if (realtimeWidget) {
     const visitorList = realtimeWidget.querySelector('[data-live-list]');

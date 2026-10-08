@@ -160,8 +160,17 @@ class PortfolioAnalytics
     public function overview(CarbonImmutable $from, CarbonImmutable $to, array $filters = []): array
     {
         $cacheKey = 'portfolio.analytics.overview.'.sha1($from->toDateString().$to->toDateString().json_encode($filters));
+        $cached = cache()->get($cacheKey);
 
-        return cache()->remember($cacheKey, now()->addMinute(), function () use ($from, $to, $filters): array {
+        if ($this->isOverviewCachePayload($cached)) {
+            return $this->hydrateOverviewCache($cached);
+        }
+
+        if ($cached !== null) {
+            cache()->forget($cacheKey);
+        }
+
+        $buildSummary = function () use ($from, $to, $filters): array {
             $sessions = $this->filteredSessions($from, $to, $filters);
             $sessionIds = (clone $sessions)->select('analytics_sessions.id');
             $views = DB::table('analytics_page_views')->whereIn('analytics_session_id', clone $sessionIds)->whereBetween('viewed_at', [$from->startOfDay(), $to->endOfDay()]);
@@ -199,7 +208,57 @@ class PortfolioAnalytics
                 'contact_form_starts' => DB::table('analytics_events')->whereIn('analytics_session_id', clone $sessionIds)->whereBetween('occurred_at', [$from->startOfDay(), $to->endOfDay()])->where('event_name', 'contact_form_start')->count(),
                 'contact_submissions' => DB::table('analytics_events')->whereIn('analytics_session_id', clone $sessionIds)->whereBetween('occurred_at', [$from->startOfDay(), $to->endOfDay()])->where('event_name', 'contact_submit')->count(),
             ];
-        });
+        };
+
+        $summary = $buildSummary();
+        cache()->put($cacheKey, $this->dehydrateOverviewCache($summary), now()->addMinute());
+
+        return $summary;
+    }
+
+    private function isOverviewCachePayload(mixed $payload): bool
+    {
+        if (! is_array($payload)) {
+            return false;
+        }
+
+        foreach (['daily', 'popular_pages', 'popular_projects', 'sources', 'devices', 'browsers', 'operating_systems', 'countries', 'events'] as $key) {
+            if (! isset($payload[$key]) || ! is_array($payload[$key]) || array_filter($payload[$key], static fn (mixed $row): bool => ! is_array($row)) !== []) {
+                return false;
+            }
+        }
+
+        foreach ($payload['sources'] as $row) {
+            if (! is_array($row) || ! isset($row['label']) || ! is_string($row['label']) || ! isset($row['total']) || ! is_numeric($row['total'])) {
+                return false;
+            }
+        }
+
+        foreach (['visitors', 'sessions', 'page_views', 'new_visitors', 'returning_visitors', 'bounce_rate', 'avg_pages', 'avg_duration', 'online', 'cv_downloads', 'contact_section_views', 'contact_form_starts', 'contact_submissions'] as $key) {
+            if (! array_key_exists($key, $payload) || ! is_numeric($payload[$key])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function dehydrateOverviewCache(array $summary): array
+    {
+        foreach (['daily', 'popular_pages', 'popular_projects', 'sources', 'devices', 'browsers', 'operating_systems', 'countries', 'events'] as $key) {
+            $summary[$key] = $summary[$key]->map(fn (object $row): array => (array) $row)->all();
+        }
+
+        return $summary;
+    }
+
+    private function hydrateOverviewCache(array $payload): array
+    {
+        foreach (['daily', 'popular_pages', 'popular_projects', 'sources', 'devices', 'browsers', 'operating_systems', 'countries', 'events'] as $key) {
+            $payload[$key] = collect(array_map(static fn (array $row): object => (object) $row, $payload[$key]));
+        }
+
+        return $payload;
     }
 
     public function sessionsQuery(array $filters = []): Builder

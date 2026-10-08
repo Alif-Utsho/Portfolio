@@ -121,8 +121,122 @@ class PortfolioAnalyticsTest extends TestCase
         $this->get(route('admin.analytics.overview'))->assertRedirect(route('admin.login'));
         $owner = User::factory()->create();
         $owner->forceFill(['is_admin' => true, 'admin_slot' => 'owner'])->save();
-        $this->actingAs($owner)->get(route('admin.analytics.overview'))->assertOk()->assertSee('No visitor analytics yet.');
-        $this->actingAs($owner)->get(route('admin.analytics.visitors'))->assertOk()->assertSee('No visitors were recorded');
+        $this->actingAs($owner)->get(route('admin.analytics.overview'))->assertOk()->assertSee('No visitor analytics yet.')->assertSee('data-analytics-filter-toggle', false)->assertSee('aria-label="Show filters"', false)->assertSee('aria-controls="analytics-filter-fields"', false);
+        $this->actingAs($owner)->get(route('admin.analytics.visitors'))->assertOk()->assertSee('No visitors were recorded')->assertSee('data-analytics-filter-toggle', false);
+        $this->actingAs($owner)->get(route('admin.analytics.sources'))->assertOk()->assertSee('data-analytics-filter-toggle', false);
+        $this->actingAs($owner)->get(route('admin.analytics.pages'))->assertOk()->assertSee('data-analytics-filter-toggle', false);
+        $this->actingAs($owner)->get(route('admin.analytics.events'))->assertOk()->assertSee('data-analytics-filter-toggle', false);
+        $this->actingAs($owner)->get(route('admin.analytics.geography'))->assertOk()->assertSee('data-analytics-filter-toggle', false);
+    }
+
+    public function test_overview_rejects_legacy_incomplete_collection_cache_and_stores_plain_arrays(): void
+    {
+        $from = CarbonImmutable::parse('2026-10-04');
+        $to = CarbonImmutable::parse('2026-10-04');
+        $cacheKey = 'portfolio.analytics.overview.'.sha1($from->toDateString().$to->toDateString().'[]');
+        $legacyCollection = unserialize('O:29:"Illuminate\\Support\\Collection":0:{}', ['allowed_classes' => false]);
+
+        cache()->put($cacheKey, ['daily' => $legacyCollection], now()->addMinute());
+
+        $analytics = app(PortfolioAnalytics::class);
+        $summary = $analytics->overview($from, $to);
+
+        $this->assertSame(0, $summary['page_views']);
+        $this->assertTrue($summary['daily']->isEmpty());
+        $this->assertIsArray(cache()->get($cacheKey)['daily']);
+        $this->assertTrue($analytics->overview($from, $to)['daily']->isEmpty());
+    }
+
+    public function test_overview_rejects_malformed_source_rows_from_cache(): void
+    {
+        $from = CarbonImmutable::parse('2026-10-04');
+        $to = CarbonImmutable::parse('2026-10-04');
+        $cacheKey = 'portfolio.analytics.overview.'.sha1($from->toDateString().$to->toDateString().'[]');
+        $analytics = app(PortfolioAnalytics::class);
+
+        $analytics->overview($from, $to);
+        $payload = cache()->get($cacheKey);
+
+        foreach ([['Direct'], [42], [(object) ['label' => 'Direct', 'total' => 1]], [['label' => 'Direct']], [['label' => 'Direct', 'total' => 'many']]] as $malformedSources) {
+            $payload['sources'] = $malformedSources;
+            cache()->put($cacheKey, $payload, now()->addMinute());
+
+            $summary = $analytics->overview($from, $to);
+
+            $this->assertTrue($summary['sources']->isEmpty());
+            $this->assertSame([], cache()->get($cacheKey)['sources']);
+        }
+    }
+
+    public function test_analytics_breakdown_view_renders_scalar_and_incomplete_rows_safely(): void
+    {
+        $owner = User::factory()->create();
+        $owner->forceFill(['is_admin' => true, 'admin_slot' => 'owner'])->save();
+        $this->actingAs($owner);
+        $date = CarbonImmutable::today();
+
+        $html = view('admin.analytics.breakdown', [
+            'title' => 'Traffic sources',
+            'eyebrow' => 'ACQUISITION',
+            'description' => 'Test breakdown',
+            'filters' => ['from' => $date, 'to' => $date, 'range' => 'today'],
+            'rows' => collect(['Direct', ['label' => 'search.example', 'total' => 3], ['label' => 'missing count']]),
+            'valueLabel' => 'Sessions',
+        ])->render();
+
+        $this->assertStringContainsString('Direct', $html);
+        $this->assertStringContainsString('search.example', $html);
+        $this->assertStringContainsString('—', $html);
+    }
+
+    public function test_analytics_filter_values_and_matching_range_preset_are_preserved(): void
+    {
+        $owner = User::factory()->create();
+        $owner->forceFill(['is_admin' => true, 'admin_slot' => 'owner'])->save();
+        $to = CarbonImmutable::today();
+        $from = $to->subDays(6);
+
+        $response = $this->actingAs($owner)->get(route('admin.analytics.sources', [
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+            'country_code' => 'US',
+            'device' => 'mobile',
+            'browser' => 'Chrome',
+            'operating_system' => 'Android',
+            'source' => 'search.example',
+            'page' => '/projects/demo',
+            'visitor_type' => 'returning',
+        ]));
+
+        $response->assertOk()
+            ->assertSee('value="7" selected', false)
+            ->assertSee('value="US"', false)
+            ->assertSee('value="mobile" selected', false)
+            ->assertSee('value="Chrome"', false)
+            ->assertSee('value="Android"', false)
+            ->assertSee('value="search.example"', false)
+            ->assertSee('value="/projects/demo"', false)
+            ->assertSee('value="returning" selected', false);
+    }
+
+    public function test_custom_analytics_range_remains_selected_and_page_detail_path_is_preserved(): void
+    {
+        $owner = User::factory()->create();
+        $owner->forceFill(['is_admin' => true, 'admin_slot' => 'owner'])->save();
+        $to = CarbonImmutable::today();
+        $from = $to->subDays(20);
+
+        $this->actingAs($owner)->get(route('admin.analytics.page', [
+            'path' => '/projects/demo',
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+        ]))->assertOk()
+            ->assertSee('aria-label="Show filters"', false)
+            ->assertSee('← All pages')
+            ->assertSee('value="custom" selected', false)
+            ->assertSee('type="hidden" name="path" value="/projects/demo"', false)
+            ->assertSee('name="from" value="'.$from->toDateString().'"', false)
+            ->assertSee('name="to" value="'.$to->toDateString().'"', false);
     }
 
     public function test_csv_exports_filtered_anonymous_sessions_without_spreadsheet_formulas(): void
